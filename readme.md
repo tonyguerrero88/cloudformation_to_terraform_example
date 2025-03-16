@@ -3,7 +3,7 @@
 This repository contains a GitHub Actions workflow that automatically converts CloudFormation templates (`.yaml` files) into Terraform configuration files (`.tf`).
 
 ## Acknowledgement 
-### CF2TF is a tool created byhttps://github.com/DontShaveTheYak/cf2tf
+### CF2TF is a tool created by [Link text](https://github.com/DontShaveTheYak/cf2tf)
 
 ## Workflow Overview
 
