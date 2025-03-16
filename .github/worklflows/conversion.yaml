@@ -1,0 +1,48 @@
+name: Convert CF Templates to Terraform
+
+on:
+  pull_request:
+  #push:
+  #  branches:
+  #   -main
+
+jobs:
+  convert_cf_to_tf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install cf2tf
+        run: |
+          pip install cf2tf  # Modify this if cf2tf requires a different install method
+
+      - name: Convert YAML files to Terraform
+        run: |
+          mkdir -p tf_templates
+          for file in cf_templates/*.yaml; do
+            [ -f "$file" ] || continue
+            filename=$(basename -- "$file")
+            filename_no_ext="${filename%.*}"
+            cf2tf "$file" > "tf_templates/${filename_no_ext}.tf"
+          done
+
+      - name: Upload Terraform Files as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: converted-terraform-files
+          path: tf_templates/
+
+      - name: Commit and Push Converted Templates
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add tf_templates/
+          git commit -m "Add converted Terraform templates"
+          git push
