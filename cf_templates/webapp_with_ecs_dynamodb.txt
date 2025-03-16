@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation template to create two VPCs connected via a Transit Gateway, ECS Fargate with a sample web application, and DynamoDB.'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: "dev"
+    Description: "Environment name (e.g., dev, prod)."
+  Vpc1CIDR:
+    Type: String
+    Default: "10.1.0.0/16"
+    Description: "CIDR block for the first VPC."
+  Vpc2CIDR:
+    Type: String
+    Default: "10.2.0.0/16"
+    Description: "CIDR block for the second VPC."
+  PublicSubnet1CIDR:
+    Type: String
+    Default: "10.1.1.0/24"
+  PublicSubnet2CIDR:
+    Type: String
+    Default: "10.1.2.0/24"
+  PublicSubnet3CIDR:
+    Type: String
+    Default: "10.1.3.0/24"
+  PrivateSubnet1CIDR:
+    Type: String
+    Default: "10.1.101.0/24"
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: "10.1.102.0/24"
+  PrivateSubnet3CIDR:
+    Type: String
+    Default: "10.1.103.0/24"
+  ECSClusterName:
+    Type: String
+    Default: "WebAppCluster"
+
+Resources:
+
+  # ---------------------- VPCs ----------------------
+  VPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref Vpc1CIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-VPC1"
+
+  VPC2:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref Vpc2CIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-VPC2"
+
+  # ---------------------- Subnets ----------------------
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
+      MapPublicIpOnLaunch: true
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
+      MapPublicIpOnLaunch: true
+
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: !Ref PublicSubnet3CIDR
+      AvailabilityZone: !Select [ 2, !GetAZs "" ]
+      MapPublicIpOnLaunch: true
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC1
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      AvailabilityZone: !Select [ 2, !GetAZs "" ]
+
+  # ---------------------- Transit Gateway ----------------------
+  TransitGateway:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      Description: "Transit Gateway connecting VPCs"
+      DefaultRouteTableAssociation: enable
+      DefaultRouteTablePropagation: enable
+
+  TGWAttachmentVPC1:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref VPC1
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
+
+  TGWAttachmentVPC2:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref VPC2
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+        - !Ref PublicSubnet3
+
+  # ---------------------- ECS Cluster ----------------------
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ECSClusterName
+
+  # ---------------------- ECS Task Definition ----------------------
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: "web-app-task"
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - "FARGATE"
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: "web-app"
+          Image: "nginx"
+          Memory: 512
+          Cpu: 256
+          PortMappings:
+            - ContainerPort: 80
+          Environment:
+            - Name: "DYNAMODB_TABLE"
+              Value: !Ref DynamoDBTable
+
+  # ---------------------- ECS Service ----------------------
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 2
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+            - !Ref PrivateSubnet3
+          SecurityGroups:
+            - !Ref WebAppSecurityGroup
+          AssignPublicIp: "ENABLED"
+
+  # ---------------------- DynamoDB Table ----------------------
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "WebAppData"
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "id"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+
+  # ---------------------- Security Groups ----------------------
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC1
+      GroupDescription: "Allow inbound HTTP"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+
+  # ---------------------- IAM Roles ----------------------
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+Outputs:
+  ECSClusterName:
+    Value: !Ref ECSCluster
+  DynamoDBTableName:
+    Value: !Ref DynamoDBTable
