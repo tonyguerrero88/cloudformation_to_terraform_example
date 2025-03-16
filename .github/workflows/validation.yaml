@@ -25,5 +25,5 @@ jobs:
           for file in cf_templates/*.yaml; do
             [ -f "$file" ] || continue
             echo "Validating: $file"
-            cf2tf "$file" | tee /dev/null
+            cf2tf "$file"
           done
