@@ -4,7 +4,7 @@ This repository contains a GitHub Actions workflow that automatically converts C
 
 # Acknowledgement
 
-The CF2TF Was Created by [DontShaveTheYak](https://github.com/DontShaveTheYak/cf2tf)
+The CF2TF tool was created by [DontShaveTheYak](https://github.com/DontShaveTheYak/cf2tf)
 
 ## Workflow Overview
 
