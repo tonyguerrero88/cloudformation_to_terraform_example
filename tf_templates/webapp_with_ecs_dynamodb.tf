@@ -1,5 +1,4 @@
-// Cloning Terraform src code to /tmp/terraform_src...
- code has been checked out.
+// Existing Terraform src code found at /tmp/terraform_src.
 
 data "aws_availability_zones" "available" {
   state = "available"
