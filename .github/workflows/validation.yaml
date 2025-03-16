@@ -1,0 +1,29 @@
+name: Validate CF to TF Conversion
+
+on:
+  pull_request:
+
+jobs:
+  validate_conversion:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install cf2tf
+        run: |
+          pip install cf2tf  # Modify this if cf2tf requires a different install method
+
+      - name: Validate YAML to Terraform Conversion and Display Output
+        run: |
+          for file in cf_templates/*.yaml; do
+            [ -f "$file" ] || continue
+            echo "Validating: $file"
+            cf2tf "$file"
+          done

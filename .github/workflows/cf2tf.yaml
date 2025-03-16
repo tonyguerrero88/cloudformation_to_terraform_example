@@ -1,10 +1,9 @@
 name: Convert CF Templates to Terraform
 
 on:
-  pull_request:
-  #push:
-  #  branches:
-  #   -main
+  push:
+    branches:
+      - main
 
 jobs:
   convert_cf_to_tf:
@@ -23,14 +22,15 @@ jobs:
         run: |
           pip install cf2tf  # Modify this if cf2tf requires a different install method
 
-      - name: Convert YAML files to Terraform
+      - name: Convert YAML files to Terraform and Display Output
         run: |
           mkdir -p tf_templates
           for file in cf_templates/*.yaml; do
             [ -f "$file" ] || continue
             filename=$(basename -- "$file")
             filename_no_ext="${filename%.*}"
-            cf2tf "$file" > "tf_templates/${filename_no_ext}.tf"
+            echo "Processing: $file"
+            cf2tf "$file" | tee "tf_templates/${filename_no_ext}.tf"
           done
 
       - name: Upload Terraform Files as Artifacts
@@ -44,5 +44,4 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add tf_templates/
-          git commit -m "Add converted Terraform templates"
-          git push
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Add converted Terraform templates [skip ci]" && git push)
