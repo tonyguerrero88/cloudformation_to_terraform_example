@@ -1,10 +1,9 @@
 name: Convert CF Templates to Terraform
 
 on:
-  pull_request:
-  #push:
-  #  branches:
-  #   -main
+  push:
+    branches:
+     -main
 
 jobs:
   convert_cf_to_tf:

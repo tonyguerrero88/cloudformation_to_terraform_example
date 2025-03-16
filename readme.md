@@ -2,17 +2,20 @@
 
 This repository contains a GitHub Actions workflow that automatically converts CloudFormation templates (`.yaml` files) into Terraform configuration files (`.tf`).
 
-## Acknowledgement 
-### CF2TF is a tool created by [DontShaveTheYak](https://github.com/DontShaveTheYak/cf2tf)
+# Acknowledgement
+---
+ CF2TF Tool created by [DontShaveTheYak](https://github.com/DontShaveTheYak/cf2tf)
 
 ## Workflow Overview
 
 ### What It Does:
-
-1. **Installs Python 3.10** using GitHub Actions.
-2. **Finds all `.yaml` files** in the `cf_templates/` folder.
-3. **Runs `cf2tf`** on each YAML file to generate the corresponding Terraform (`.tf`) file.
-4. **Uploads the Terraform files** as artifacts for download.
+1. **Runs on push to main** to ensure Terraform templates are generated and stored correctly.
+2. **Installs Python 3.10** using GitHub Actions.
+3. **Finds all `.yaml` files** in the `cf_templates/` folder.
+4. **Runs `cf2tf`** on each YAML file to generate the corresponding Terraform (`.tf`) file.
+5. **Displays the output of the conversion in the action logs.**
+6. **Uploads the Terraform files** as artifacts for download.
+7. **Commits and pushes the generated Terraform files** back to the repository under the `tf_templates/` folder.
 
 ## Workflow File: `.github/workflows/cf2tf.yml`
 
@@ -23,7 +26,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
 
 jobs:
   convert_cf_to_tf:
@@ -42,93 +44,59 @@ jobs:
         run: |
           pip install cf2tf  # Modify this if cf2tf requires a different install method
 
-      - name: Convert YAML files to Terraform
+      - name: Convert YAML files to Terraform and Display Output
         run: |
-          mkdir -p converted_tf
+          mkdir -p tf_templates
           for file in cf_templates/*.yaml; do
             [ -f "$file" ] || continue
             filename=$(basename -- "$file")
             filename_no_ext="${filename%.*}"
-            cf2tf "$file" > "converted_tf/${filename_no_ext}.tf"
+            echo "Processing: $file"
+            cf2tf "$file" | tee "tf_templates/${filename_no_ext}.tf"
           done
 
       - name: Upload Terraform Files as Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: converted-terraform-files
-          path: converted_tf/
-```
+          path: tf_templates/
 
-## Fixing `Missing download info for actions/upload-artifact@v3`
-
-If you encounter this error, try one of the following solutions:
-
-### 1. Use the Latest Version
-
-Change the artifact upload step to use `v4`:
-
-```yaml
-      - name: Upload Terraform Files as Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: converted-terraform-files
-          path: converted_tf/
-```
-
-### 2. Use the Full Version Number
-
-Specify the full version of `upload-artifact`:
-
-```yaml
-      - name: Upload Terraform Files as Artifacts
-        uses: actions/upload-artifact@v4.3.1
-        with:
-          name: converted-terraform-files
-          path: converted_tf/
-```
-
-### 3. Ensure Network Connectivity
-
-If using a self-hosted runner, verify it has internet access:
-
-```bash
-curl -L https://api.github.com/repos/actions/upload-artifact/releases/latest
-```
-
-### 4. Manually Specify the Repository
-
-Try explicitly defining the repository reference:
-
-```yaml
-      - name: Upload Terraform Files as Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: converted-terraform-files
-          path: converted_tf/
-```
-
-### 5. Clear GitHub Actions Cache
-
-Delete existing workflow runs and restart a fresh run.
-
-### 6. Commit and Push Generated Files Instead
-
-If you prefer to commit the `.tf` files to the repository instead of uploading them as artifacts, add this step:
-
-```yaml
-      - name: Commit and Push Changes
+      - name: Commit and Push Converted Templates
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add converted_tf/
-          git commit -m "Add converted Terraform files"
+          git add tf_templates/
+          git commit -m "Add converted Terraform templates"
           git push
 ```
 
+## Explanation of Workflow Steps
+
+### 1. Trigger on Push to Main
+- This workflow runs when **code is pushed to the `main` branch**.
+- Ensures Terraform files are generated and stored properly.
+
+### 2. Install Dependencies
+- Uses **Python 3.10**.
+- Installs **cf2tf**, a tool to convert CloudFormation YAML files to Terraform.
+
+### 3. Convert YAML Files to Terraform and Display Output
+- It finds all `.yaml` files in the `cf_templates/` folder.
+- Converts them to `.tf` files and stores them in `tf_templates/`.
+- Displays the conversion output in the GitHub Actions logs for visibility.
+
+### 4. Upload Terraform Files as Artifacts
+- Stores generated `.tf` files as GitHub artifacts, allowing easy download.
+
+### 5. Commit and Push Terraform Files
+- Automatically commits the generated `.tf` files to the repository under `tf_templates/`.
+- Ensures that every push to `main` includes its Terraform equivalents.
+
 ## Summary
+- **Runs on push to main** to maintain Terraform files.
+- **Converts CloudFormation YAML to Terraform**.
+- **Displays conversion output in logs** for easier debugging.
+- **Uploads artifacts** for review.
+- **Commits Terraform templates** back to the repository.
 
-- This workflow automates CloudFormation to Terraform conversion.
-- Fixes for `upload-artifact` errors are provided.
-- Files can either be uploaded as artifacts or committed directly to the repository.
 
-Would you like additional customizations? 🚀
